@@ -4,12 +4,11 @@ module UART #(parameter BaudRate = 9600, RefFrequency = 10_000_000, N = 8)(
     input    wire  [N-1:0]   DATAI, 
     output   reg   [N-1:0]   DATAO, 
     input    wire            WR, 
-    output   reg             BUSY, 
+    output   wire            BUSY, 
     output   reg             VALID, 
     output   reg             TX,
     input    wire            RX
     );
-
 
     localparam  cycle = RefFrequency/BaudRate;
 
@@ -19,9 +18,15 @@ module UART #(parameter BaudRate = 9600, RefFrequency = 10_000_000, N = 8)(
     reg          [  7:0]  bit0     = 0;
     reg          [  7:0]  bit1     = 0;
     reg          [N-1:0]  datai    = 0;
+    reg          [N-1:0]  datao    = 0;
     reg                   recving  = 0;
     reg                   sending  = 0;
-    
+
+    initial begin
+        DATAO <= 0;
+        VALID <= 0;
+        TX    <= 0;
+    end
 
     always @(posedge CLOCK or negedge RESET_N) begin
         if (!RESET_N) begin
@@ -34,17 +39,18 @@ module UART #(parameter BaudRate = 9600, RefFrequency = 10_000_000, N = 8)(
             if (recving) begin
                 if (count0 < cycle) begin
                     count0 <= count0+1;
-                    bit0 <= bit0+1; 
                     varCount = RX ? varCount+1 : varCount-1;
                 end else if(count0 == cycle) begin
-                    count0 <= count0+1;
+                    count0 <= count0+1; 
+                    bit0 <= bit0+1; 
                     if (bit0 == 0) begin
                         if (varCount>0) begin
                             recving <= 0;
                         end 
                     end else if (bit0 <= N) begin
-                        DATAO[bit-1] <= varCount>0?1:0;
+                        datao[bit0-1] <= varCount>0?1:0;
                     end else begin
+                        DATAO <= datao;
                         VALID <= 1;
                         recving <= 0;
                     end  
@@ -59,14 +65,14 @@ module UART #(parameter BaudRate = 9600, RefFrequency = 10_000_000, N = 8)(
                     bit0 <= 0;
                     varCount <= 0;
                     VALID <= 0;
+                    datao <= 0;
                 end
             end 
         end
     end
 
-
     assign  BUSY = sending;
-    
+
     always @(posedge CLOCK or negedge RESET_N) begin
         if (!RESET_N) begin
             count1 <= 0;
@@ -79,10 +85,10 @@ module UART #(parameter BaudRate = 9600, RefFrequency = 10_000_000, N = 8)(
                     count1 <= count1+1;
                 end else if(count1 == cycle) begin
                     count1 <= count1+1; 
-                    bit0 <= bit0+1; 
-                    if (bit0 < N) begin
-                        TX <= DATAI[bit];
-                    end else if (bit0 == N) begin 
+                    bit1 <= bit1+1; 
+                    if (bit1 < N) begin
+                        TX <= datai[bit1];
+                    end else if (bit1 == N) begin 
                         TX <= 1;
                     end else begin 
                         sending <= 0;
@@ -94,12 +100,12 @@ module UART #(parameter BaudRate = 9600, RefFrequency = 10_000_000, N = 8)(
                 if (WR) begin
                     sending <= 1; 
                     count1 <= 1;
+                    datai <= DATAI;
                     bit1 <= 0;
                     TX <= 0;
                 end
             end
         end
     end
-
 
 endmodule 

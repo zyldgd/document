@@ -2,65 +2,79 @@
 
 module testbench();
 
-localparam D = 8;
-localparam A = 4;
+localparam n = 8;
 
 wire  SS;
 wire  SCLK;
 wire  MOSI;
 wire  MISO;
 wire  BUSY;
+wire  TX;
+wire  RX;
 
 reg   CLK  = 0;
-reg   WR   = 0;
-reg   RD   = 0;
+reg   WR0  = 0; 
+reg   WR1  = 0; 
 
-reg [D-1:0]   DATAI = 0;
-reg [A-1:0]   ADDR = 0; 
+reg [n-1:0]   DATA0   = 0;
+reg [n-1:0]   DATA1   = 0; 
+reg           RESET_N = 1; 
 
 
-always @(*) begin
-    #50 CLK <= ~CLK;
-end
+always #1 CLK <= ~CLK;
 
-initial begin
-    #0 
-    DATAI = 205;
-    ADDR  = 7;
+
+initial begin 
     #100 
-    WR    = 1;
-    #100 
-    WR    = 0;
-
+    RESET_N <= 0;
+    #100
+    RESET_N <= 1;
+    
+    #1000
+    DATA0   <= 77;
+    DATA1   <= 88;
     #2000 
-    ADDR  = 7;
-    #100 
-    RD    = 1;
-    #100 
-    RD    = 0;
+    WR0     <= 1;
+    WR1     <= 1;
+    #200 
+    WR0     <= 0;
+    WR1     <= 0;
+
+    #30000
+    DATA0   <= 55;
+    DATA1   <= 66;
+    #2000 
+    WR0     <= 1;
+    WR1     <= 1;
+    #200 
+    WR0     <= 0;
+    WR1     <= 0;
+
 end
 
-SPI_MASTER #(.D(D), .A(A)) M(
-    .CLOCK      (CLK),
-    .DATAO      (),
-    .DATAI      (DATAI),
-    .ADDR       (ADDR),
-    .WR         (WR),
-    .RD         (RD),
-    .BUSY       (BUSY),
+UART #(.BaudRate(9600), .RefFrequency(10_000_000), .N(n)) U1(
+    .CLOCK     (CLK),
+    .RESET_N   (RESET_N),
+    .DATAI     (DATA0), 
+    .DATAO     (), 
+    .WR        (WR0), 
+    .BUSY      (), 
+    .VALID     (), 
+    .TX        (TX),
+    .RX        (RX)
+    );
 
-    .SS         (SS),
-    .SCLK       (SCLK),
-    .MOSI       (MOSI),
-    .MISO       (MISO)
-);
-
-SPI_SLAVE #(.D(D), .A(A)) S(
-    .SS         (SS  ),
-    .SCLK       (SCLK),
-    .MOSI       (MOSI),
-    .MISO       (MISO)
-);
+UART #(.BaudRate(9600), .RefFrequency(10_000_000), .N(n)) U2(
+    .CLOCK     (CLK),
+    .RESET_N   (RESET_N),
+    .DATAI     (DATA1), 
+    .DATAO     (), 
+    .WR        (WR1), 
+    .BUSY      (), 
+    .VALID     (), 
+    .TX        (RX),
+    .RX        (TX)
+    );
 
 endmodule
 
